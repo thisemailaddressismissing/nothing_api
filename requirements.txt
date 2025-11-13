@@ -1,0 +1,7 @@
+Flask==3.0.3
+flask-cors==4.0.0
+Pillow==10.3.0
+PyMuPDF==1.24.10
+requests==2.32.3
+bnunicodenormalizer==1.0.1
+bangla==0.0.2
