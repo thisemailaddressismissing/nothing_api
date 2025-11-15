@@ -590,8 +590,55 @@ def get_image_dimensions(pil_image):
     pixel_area = width * height
     return width, height, pixel_area
 
+def classify_image(pil_image, width, height, pixel_area):
+    """Classify whether image is photo or signature based on characteristics."""
+    
+    # Calculate aspect ratio
+    aspect_ratio = width / height if height > 0 else 1
+    
+    # Photo characteristics:
+    # - Larger size (>50000 pixels)
+    # - Near-square or wider aspect ratio (0.8 to 1.3)
+    # - More diverse colors
+    
+    # Signature characteristics:
+    # - Smaller size (<30000 pixels)
+    # - Taller/narrower aspect ratio (0.3 to 0.7)
+    # - Mostly grayscale/black & white
+    
+    is_photo = False
+    is_signature = False
+    confidence = "Medium"
+    
+    if pixel_area > 50000:
+        # Large image - likely photo
+        if 0.7 < aspect_ratio < 1.5:
+            is_photo = True
+            confidence = "High"
+        else:
+            confidence = "Medium"
+    elif 20000 < pixel_area < 50000:
+        # Medium image
+        if aspect_ratio < 0.7:
+            is_signature = True
+            confidence = "High"
+        else:
+            is_photo = True
+            confidence = "Medium"
+    else:
+        # Small image - likely signature
+        is_signature = True
+        confidence = "High"
+    
+    return {
+        "type": "photo" if is_photo else "signature" if is_signature else "unknown",
+        "aspect_ratio": round(aspect_ratio, 2),
+        "confidence": confidence,
+        "pixel_area": pixel_area
+    }
+
 def extract_images_and_text_from_pdf(pdf_bytes):
-    """Extract images and text from PDF bytes."""
+    """Extract images and text from PDF bytes with classification."""
     
     # Open PDF from bytes
     pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -649,6 +696,9 @@ def extract_images_and_text_from_pdf(pdf_bytes):
                 # Get image dimensions
                 width, height, pixel_area = get_image_dimensions(pil_image)
                 
+                # Classify image type
+                classification = classify_image(pil_image, width, height, pixel_area)
+                
                 # Convert to base64
                 buffered = io.BytesIO()
                 pil_image.save(buffered, format="PNG")
@@ -661,7 +711,10 @@ def extract_images_and_text_from_pdf(pdf_bytes):
                     "base64": img_base64,
                     "width": width,
                     "height": height,
-                    "pixel_area": pixel_area
+                    "pixel_area": pixel_area,
+                    "type": classification["type"],
+                    "aspect_ratio": classification["aspect_ratio"],
+                    "confidence": classification["confidence"]
                 })
                 
             except Exception as e:
@@ -678,17 +731,19 @@ def extract_images_and_text_from_pdf(pdf_bytes):
                         "base64": img_base64,
                         "width": width,
                         "height": height,
-                        "pixel_area": pixel_area
+                        "pixel_area": pixel_area,
+                        "type": "unknown",
+                        "confidence": "Low"
                     })
                 except:
                     pass
     
     pdf_document.close()
     
-    # Sort images by size (largest first - photo, then signature)
-    images_data.sort(key=lambda x: x['pixel_area'], reverse=True)
+    # Sort: photos first (by size descending), then signatures
+    images_data.sort(key=lambda x: (x['type'] != 'photo', -x['pixel_area']))
     
-    # Remove size info from final output
+    # Remove pixel_area from final output
     images_base64 = [{k: v for k, v in img.items() if k not in ['pixel_area']} for img in images_data]
     
     return images_base64, all_text
