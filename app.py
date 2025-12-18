@@ -105,7 +105,7 @@ def normalize_all_fields(data):
 
 def remove_background(image_base64):
     """Remove background from image using Bria API."""
-    api_token = "78df2ae59d884a25b62f2aa0f7642f26"
+    api_token = "88389cc7ad0f439dad791a9743d16c7b"
     
     try:
         # Step 1: Send POST request to remove background
